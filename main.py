@@ -61,6 +61,10 @@ class LoginRequest(BaseModel):
 class Question(BaseModel):
      question: str = Field(min_length=1, max_length=5000)
 
+class ChatRequest(BaseModel):
+     session_id: str
+     question: str
+
 class Answer(BaseModel):
      answer: str
 
@@ -141,3 +145,41 @@ def login(data: LoginRequest):
          "access_token":token,
          "token_type":"bearer"
     }
+
+chat_history = {}
+
+@app.post("/chat", response_model=Answer)
+async def chat(data: ChatRequest):
+
+
+     history = chat_history.get(data.session_id, [])
+
+     
+     history.append({
+          "role": "user",
+          "parts": [
+               {"text": data.question}
+          ]
+     })
+
+
+     response = await client.aio.models.generate_content(
+          model="gemini-3.1-flash-lite",
+          contents=history
+     )
+
+     history.append({
+          "role": "model",
+          "parts": [
+               {"text": response.text}
+          ]
+     })
+
+     chat_history[data.session_id] = history
+
+
+     return {
+          "answer": response.text
+     }
+
+     
