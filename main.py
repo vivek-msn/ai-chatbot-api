@@ -188,4 +188,17 @@ async def chat(data: ChatRequest):
           "answer": response.text
      }
 
-     
+@app.delete("/chat/{session_id}")
+async def clear_chat(session_id: str):
+
+     if session_id not in chat_history:
+          raise HTTPException(
+               status_code=404,
+               detail="Session not found"
+          )
+
+     del chat_history[session_id]
+
+     return {
+          "message": "Chat history cleared successfully"
+     }
