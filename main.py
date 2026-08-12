@@ -148,26 +148,30 @@ def login(data: LoginRequest):
 
 chat_history = {}
 
+MAX_HISTORY = 4
+
 @app.post("/chat", response_model=Answer)
 async def chat(data: ChatRequest):
 
 
      history = chat_history.get(data.session_id, [])
 
-     
+     # Keep space for current user message + AI response
+     history = history[-(MAX_HISTORY - 2):]
+
      history.append({
           "role": "user",
           "parts": [
                {"text": data.question}
           ]
      })
-
-
+     #Send only limited history to Gemini 
      response = await client.aio.models.generate_content(
           model="gemini-3.1-flash-lite",
           contents=history
      )
 
+     # Add AI response
      history.append({
           "role": "model",
           "parts": [
@@ -175,8 +179,10 @@ async def chat(data: ChatRequest):
           ]
      })
 
-     chat_history[data.session_id] = history
+     # Save only latest MAX_HISTORY messages
+     history = history[-MAX_HISTORY:]
 
+     chat_history[data.session_id] = history
 
      return {
           "answer": response.text
