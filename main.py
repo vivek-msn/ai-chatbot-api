@@ -44,10 +44,6 @@ class User(BaseModel):
         age:int = Field(ge=18,le=100)
         email: Optional [str] = None
 
-class LoginRequest(BaseModel):
-     username: str
-     password: str
-
 class Question(BaseModel):
      question: str = Field(min_length=1, max_length=5000)
 
@@ -62,6 +58,8 @@ class LoginRequest(BaseModel):
      username: str
      password: str
 
+
+     
 def create_token(username: str):
      payload ={
           "sub": username
@@ -92,6 +90,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
                status_code=401,
                detail="Invalid or expired token"
           )
+
+
+     
 
 @app.post("/login")
 async def login(data: LoginRequest):
@@ -142,6 +143,7 @@ def about():
          summary="Get user",
          description="Fetch user information by using user id.",
          tags=["Users"])
+
 def users(userid: int):
     return{"userid": userid,
            "message": f"This is {userid} user"
@@ -192,9 +194,19 @@ chat_history = {}
 MAX_HISTORY = 4
 
 @app.post("/chat", response_model=Answer)
-async def chat(data: ChatRequest, user=Depends(verify_token)):
+async def chat(
+     data: ChatRequest,
+     user=Depends(verify_token)
+):
 
+     username = user["sub"]
 
+     if not data.session_id.startswith(username + "-"):
+          raise HTTPException(
+               status_code=403,
+               detail="You do not have access to this session"
+          )
+          
      history = chat_history.get(data.session_id, [])
 
      # Keep space for current user message + AI response
