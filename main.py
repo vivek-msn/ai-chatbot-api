@@ -10,11 +10,15 @@ from dotenv import load_dotenv
 
 from google import genai
 
+from datetime import datetime, timedelta, time
+
 import os
 
 import jwt
 
 load_dotenv()
+
+SECRET_KEY=os.getenv("SECRET_KEY")
 
 api_key = os.getenv("GOOGLE_API_KEY")
 
@@ -26,28 +30,14 @@ app = FastAPI()
 
 security = HTTPBearer()
 
-SECRET_KEY = "my-super-secret-key"
 
-def create_token(username: str):
-     payload ={
-          "sub": username
-     }
-
-     token = jwt.encode(
-          payload,
-          SECRET_KEY,
-          algorithm="HS256"
-     )
-
-     return token
-
-def check_api_key(x_api_key: str = Header(...)):
-     if x_api_key != "my-secret-key-123":
-          raise HTTPException(
-               status_code=401,
-               detail="Invalid API Key"
-          )
-     return x_api_key
+# def check_api_key(x_api_key: str = Header(...)):
+#      if x_api_key != "my-secret-key-123":
+#           raise HTTPException(
+#                status_code=401,
+#                detail="Invalid API Key"
+#           )
+#      return x_api_key
 
 class User(BaseModel):
         name:str = Field(min_length=2, max_length=50)
@@ -67,6 +57,57 @@ class ChatRequest(BaseModel):
 
 class Answer(BaseModel):
      answer: str
+
+class LoginRequest(BaseModel):
+     username: str
+     password: str
+
+def create_token(username: str):
+     payload ={
+          "sub": username
+     }
+
+     token = jwt.encode(
+          payload,
+          SECRET_KEY,
+          algorithm="HS256"
+     )
+
+     return token
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+     token = credentials.credentials
+
+     try:
+          payload = jwt.decode(
+               token,
+               SECRET_KEY,
+               algorithms=["HS256"]
+          )
+
+          return payload
+
+     except jwt.InvalidTokenError:
+          raise HTTPException(
+               status_code=401,
+               detail="Invalid or expired token"
+          )
+
+@app.post("/login")
+async def login(data: LoginRequest):
+
+     if data.username != "vivek" or data.password != "12345":
+          raise HTTPException(
+               status_code=401,
+               detail="Invalid username or password"
+          )
+
+     token = create_token(data.username)
+
+     return {
+          "access_token": token,
+          "token_type": "bearer"
+     }
 
 @app.post("/ask",response_model=Answer)
 async def ask_ai(data: Question):
@@ -125,33 +166,33 @@ def create_user(user: User):
 # def add_user(user: User):
 #     return  user
 
-@app.post("/secure")
-def secure_api(api_key: str = Depends(check_api_key)):
-     return {
-          "message": "Access Granted"
-     }
+# @app.post("/secure")
+# def secure_api(api_key: str = Depends(check_api_key)):
+#      return {
+#           "message": "Access Granted"
+#      }
 
-@app.post("/login")
-def login(data: LoginRequest):
-    if data.username != "vivek" or data.password !="12345":
-         raise HTTPException(
-              status_code=401,
-              detail="Invalid credentials"
-         )
+# @app.post("/login")
+# def login(data: LoginRequest):
+#     if data.username != "vivek" or data.password !="12345":
+#          raise HTTPException(
+#               status_code=401,
+#               detail="Invalid credentials"
+#          )
 
-    token = create_token(data.username)
+#     token = create_token(data.username)
 
-    return{
-         "access_token":token,
-         "token_type":"bearer"
-    }
+#     return{
+#          "access_token":token,
+#          "token_type":"bearer"
+#     }
 
 chat_history = {}
 
 MAX_HISTORY = 4
 
 @app.post("/chat", response_model=Answer)
-async def chat(data: ChatRequest):
+async def chat(data: ChatRequest, user=Depends(verify_token)):
 
 
      history = chat_history.get(data.session_id, [])
