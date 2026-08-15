@@ -48,8 +48,8 @@ class Question(BaseModel):
      question: str = Field(min_length=1, max_length=5000)
 
 class ChatRequest(BaseModel):
-     session_id: str
-     question: str
+     session_id: str = Field(min_length=1, pattern=r"^[a-zA-Z0-9]+-[0-9]+$")
+     question: str = Field(min_length=1,max_length=5000)
 
 class Answer(BaseModel):
      answer: str
