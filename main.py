@@ -219,11 +219,19 @@ async def chat(
                {"text": data.question}
           ]
      })
+
+     try:
      #Send only limited history to Gemini 
-     response = await client.aio.models.generate_content(
-          model="gemini-3.1-flash-lite",
-          contents=history
-     )
+          response = await client.aio.models.generate_content(
+               model="gemini-3.1-flash-lite",
+               contents=history
+          )
+
+     except Exception as e:
+          raise HTTPException(
+               status_code=503,
+               detail="AI service is currently unavailable"
+          )
 
      # Add AI response
      history.append({
