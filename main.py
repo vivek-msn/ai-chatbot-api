@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from google import genai
 
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, timezone
 
 import os
 
@@ -62,7 +62,8 @@ class LoginRequest(BaseModel):
      
 def create_token(username: str):
      payload ={
-          "sub": username
+          "sub": username,
+          "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
      }
 
      token = jwt.encode(
