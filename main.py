@@ -242,7 +242,17 @@ async def chat(
      }
 
 @app.delete("/chat/{session_id}")
-async def clear_chat(session_id: str):
+async def clear_chat(session_id: str,
+          user=Depends(verify_token)
+          ):
+     
+     username = user["sub"]
+
+     if not session_id.startswith(username + "-"):
+          raise HTTPException(
+               status_code=403,
+               detail="You do not have access to this session"
+          )
 
      if session_id not in chat_history:
           raise HTTPException(
