@@ -16,6 +16,8 @@ import os
 
 import jwt
 
+import logging
+
 load_dotenv()
 
 SECRET_KEY=os.getenv("SECRET_KEY")
@@ -29,6 +31,8 @@ client = genai.Client(
 app = FastAPI()
 
 security = HTTPBearer()
+
+logger = logging.getLogger(__name__)
 
 
 # def check_api_key(x_api_key: str = Header(...)):
@@ -228,6 +232,8 @@ async def chat(
           )
 
      except Exception as e:
+          logger.error("Gemini API request failed: %s", e)
+          
           raise HTTPException(
                status_code=503,
                detail="AI service is currently unavailable"
