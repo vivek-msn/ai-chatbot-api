@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from main import app, create_token, chat_history
+from main import app, create_token
 from database import SessionLocal
 from models import ChatSession, ChatMessage
 
@@ -122,15 +122,6 @@ def test_delete_own_session():
     finally:
         db.close()
 
-    # chat_history["vivek-01"] = [
-    #     {
-    #         "role": "user",
-    #         "parts": [
-    #             {"text": "Hello"}
-    #         ]
-    #     }
-    # ]
-
     response = client.delete(
         "/chat/vivek-test-delete",
         headers={
@@ -156,15 +147,6 @@ def test_delete_own_session():
 
 def test_delete_other_users_session():
     token = create_token("vivek")
-
-    chat_history["amit-01"] = [
-        {
-            "role" : "user",
-            "parts" : [
-                {"text": "Hello"}
-            ]
-        }
-    ]
 
     response = client.delete(
         "/chat/amit-01",

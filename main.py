@@ -200,8 +200,6 @@ def create_user(user: User):
 #          "token_type":"bearer"
 #     }
 
-chat_history = {}
-
 MAX_HISTORY = 4
 
 @app.post("/chat", response_model=Answer)
@@ -268,21 +266,6 @@ async def chat(
           for message in messages[-MAX_HISTORY:]
      ]
 
-          
-
-     
-     # history = chat_history.get(data.session_id, [])
-
-     # Keep space for current user message + AI response
-     # history = history[-(MAX_HISTORY - 2):]
-
-     # history.append({
-     #      "role": "user",
-     #      "parts": [
-     #           {"text": data.question}
-     #      ]
-     # })
-
      try:
      #Send only limited history to Gemini 
           response = await client.aio.models.generate_content(
@@ -297,19 +280,6 @@ async def chat(
                status_code=503,
                detail="AI service is currently unavailable"
           )
-
-     # Add AI response
-     # history.append({
-     #      "role": "model",
-     #      "parts": [
-     #           {"text": response.text}
-     #      ]
-     # })
-
-     # # Save only latest MAX_HISTORY messages
-     # history = history[-MAX_HISTORY:]
-
-     # chat_history[data.session_id] = history
 
      ai_message = ChatMessage(
           session_id=chat_session.id,
@@ -354,14 +324,6 @@ async def clear_chat(session_id: str,
      db.delete(chat_session)
 
      db.commit()
-     
-     # if session_id not in chat_history:
-     #      raise HTTPException(
-     #           status_code=404,
-     #           detail="Session not found"
-     #      )
-
-     # del chat_history[session_id]
 
      return {
           "message": "Chat history cleared successfully"
