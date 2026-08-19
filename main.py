@@ -18,6 +18,12 @@ import jwt
 
 import logging
 
+from sqlalchemy.orm import Session
+
+from database import get_db
+
+from models import User as DBUser, ChatSession, ChatMessage
+
 load_dotenv()
 
 SECRET_KEY=os.getenv("SECRET_KEY")
@@ -201,28 +207,81 @@ MAX_HISTORY = 4
 @app.post("/chat", response_model=Answer)
 async def chat(
      data: ChatRequest,
-     user=Depends(verify_token)
+     user=Depends(verify_token),
+     db: Session = Depends(get_db)
 ):
 
      username = user["sub"]
 
      if not data.session_id.startswith(username + "-"):
+               raise HTTPException(
+                    status_code=403,
+                    detail="You do not have access to this session"
+               )
+               
+
+     db_user = db.query(DBUser).filter(
+          DBUser.username == username
+     ).first()
+
+     if not db_user:
           raise HTTPException(
-               status_code=403,
-               detail="You do not have access to this session"
+               status_code=404,
+               detail="User not found"
           )
+
+     chat_session = db.query(ChatSession).filter(
+          ChatSession.session_id == data.session_id
+     ).first()
+
+     if not chat_session:
+          chat_session = ChatSession(
+               session_id=data.session_id,
+               user_id=db_user.id
+          )
+
+          db.add(chat_session)
+          db.commit()
+          db.refresh(chat_session)
+
+
+     user_message = ChatMessage(
+     session_id=chat_session.id,
+     role="user",
+     message=data.question
+     )
+
+     db.add(user_message)
+     db.commit()
+
+     messages = db.query(ChatMessage).filter(
+          ChatMessage.session_id == chat_session.id
+     ).order_by(ChatMessage.id.asc()).all()
+
+     history = [
+          {
+               "role": message.role,
+               "parts": [
+                    {"text": message.message}
+               ]
+          }
+          for message in messages[-MAX_HISTORY:]
+     ]
+
           
-     history = chat_history.get(data.session_id, [])
+
+     
+     # history = chat_history.get(data.session_id, [])
 
      # Keep space for current user message + AI response
-     history = history[-(MAX_HISTORY - 2):]
+     # history = history[-(MAX_HISTORY - 2):]
 
-     history.append({
-          "role": "user",
-          "parts": [
-               {"text": data.question}
-          ]
-     })
+     # history.append({
+     #      "role": "user",
+     #      "parts": [
+     #           {"text": data.question}
+     #      ]
+     # })
 
      try:
      #Send only limited history to Gemini 
@@ -240,17 +299,26 @@ async def chat(
           )
 
      # Add AI response
-     history.append({
-          "role": "model",
-          "parts": [
-               {"text": response.text}
-          ]
-     })
+     # history.append({
+     #      "role": "model",
+     #      "parts": [
+     #           {"text": response.text}
+     #      ]
+     # })
 
-     # Save only latest MAX_HISTORY messages
-     history = history[-MAX_HISTORY:]
+     # # Save only latest MAX_HISTORY messages
+     # history = history[-MAX_HISTORY:]
 
-     chat_history[data.session_id] = history
+     # chat_history[data.session_id] = history
+
+     ai_message = ChatMessage(
+          session_id=chat_session.id,
+          role="model",
+          message=response.text
+     )
+
+     db.add(ai_message)
+     db.commit()
 
      return {
           "answer": response.text
@@ -258,7 +326,8 @@ async def chat(
 
 @app.delete("/chat/{session_id}")
 async def clear_chat(session_id: str,
-          user=Depends(verify_token)
+          user=Depends(verify_token),
+          db: Session = Depends(get_db)
           ):
      
      username = user["sub"]
@@ -269,13 +338,30 @@ async def clear_chat(session_id: str,
                detail="You do not have access to this session"
           )
 
-     if session_id not in chat_history:
+     chat_session = db.query(ChatSession).filter(
+          ChatSession.session_id == session_id
+     ).first()
+
+     if not chat_session:
           raise HTTPException(
                status_code=404,
                detail="Session not found"
           )
+     db.query(ChatMessage).filter(
+          ChatMessage.session_id == chat_session.id
+     ).delete()
 
-     del chat_history[session_id]
+     db.delete(chat_session)
+
+     db.commit()
+     
+     # if session_id not in chat_history:
+     #      raise HTTPException(
+     #           status_code=404,
+     #           detail="Session not found"
+     #      )
+
+     # del chat_history[session_id]
 
      return {
           "message": "Chat history cleared successfully"

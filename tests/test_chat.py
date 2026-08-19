@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 from main import app, create_token, chat_history
+from database import SessionLocal
+from models import ChatSession, ChatMessage
 
 client = TestClient(app)
 
@@ -96,17 +98,41 @@ def test_chat_with_other_users_session():
 def test_delete_own_session():
     token = create_token("vivek")
 
-    chat_history["vivek-01"] = [
-        {
-            "role": "user",
-            "parts": [
-                {"text": "Hello"}
-            ]
-        }
-    ]
+    db = SessionLocal()
+
+    try:
+        chat_session = ChatSession(
+            session_id="vivek-test-delete",
+            user_id=1
+        )
+
+        db.add(chat_session)
+        db.commit()
+        db.refresh(chat_session)
+
+        message = ChatMessage(
+            session_id=chat_session.id,
+            role="user",
+            message="Hello"
+        )
+
+        db.add(message)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # chat_history["vivek-01"] = [
+    #     {
+    #         "role": "user",
+    #         "parts": [
+    #             {"text": "Hello"}
+    #         ]
+    #     }
+    # ]
 
     response = client.delete(
-        "/chat/vivek-01",
+        "/chat/vivek-test-delete",
         headers={
             "Authorization": f"Bearer {token}",
         }
@@ -114,7 +140,18 @@ def test_delete_own_session():
 
     assert response.status_code == 200
     assert response.json()["message"] == "Chat history cleared successfully"
-    assert "vivek-01" not in chat_history
+
+    db = SessionLocal()
+
+    try:
+        deleted_session = db.query(ChatSession).filter(
+            ChatSession.session_id == "vivek-test-delete"
+        ).first()
+
+        assert deleted_session is None
+
+    finally:
+        db.close()
 
 
 def test_delete_other_users_session():
